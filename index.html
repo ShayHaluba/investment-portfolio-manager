@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ILS Portfolio Rebalancer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{--bg:#fff;--bg2:#f5f5f3;--text:#1a1a18;--text2:#5f5e5a;--text3:#888780;--border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.25);--r:8px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'JetBrains Mono','Fira Code',monospace;}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1a;--bg2:#252523;--text:#e8e6df;--text2:#b4b2a9;--text3:#888780;--border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.25);}}
+body{font-family:var(--font);background:var(--bg);color:var(--text);padding:1.5rem;max-width:1040px;margin:0 auto;font-size:14px;line-height:1.6;}
+h1{font-size:19px;font-weight:500;}.sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.4rem;}
+.fetch-btn{display:flex;align-items:center;gap:7px;font-size:12px;padding:7px 14px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;font-family:var(--font);white-space:nowrap;}
+.fetch-btn:hover{background:var(--bg2);}.fetch-btn:active{transform:scale(0.98);}.fetch-btn:disabled{opacity:.5;cursor:not-allowed;}
+.price-stamp{font-size:11px;color:var(--text3);margin-top:4px;text-align:right;min-height:16px;}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.4rem;}
+.metric{background:var(--bg2);border-radius:var(--r);padding:10px 14px;}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;}
+.metric-value{font-size:20px;font-weight:500;}
+.slabel{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;}
+.overflow{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:11px;font-weight:500;color:var(--text2);padding:5px 8px;border-bottom:0.5px solid var(--border);text-align:right;white-space:nowrap;}
+th.L,td.L{text-align:left;}
+td{padding:5px 8px;border-bottom:0.5px solid var(--border);font-size:12px;text-align:right;color:var(--text);vertical-align:middle;}
+tfoot td{font-weight:500;font-size:12px;}
+input[type=number]{font-family:var(--mono);font-size:12px;text-align:right;padding:3px 5px;border:0.5px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);outline:none;width:72px;}
+input[type=number]:focus{border-color:var(--border2);}
+.ticker{font-family:var(--mono);font-size:12px;font-weight:500;}
+a.ticker{color:inherit;text-decoration:none;border-bottom:1px dashed var(--border2);}
+a.ticker:hover{color:#378ADD;border-bottom-color:#378ADD;}
+.cur-sel{font-size:11px;padding:2px 2px;border:0.5px solid var(--border);border-radius:3px;background:var(--bg);color:var(--text2);cursor:pointer;margin-left:3px;font-family:var(--mono);}
+.price-hint{font-size:10px;color:var(--text3);text-align:right;min-height:13px;line-height:1.3;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;flex-shrink:0;}
+.tag{font-size:10px;padding:1px 5px;border-radius:3px;margin-left:3px;}
+.tag-IE{background:#E1F5EE;color:#0F6E56;}.tag-IL{background:#E6F1FB;color:#185FA5;}.tag-US{background:#FAEEDA;color:#854F0B;}
+.over{color:#0F6E56;font-family:var(--mono);}.under{color:#993C1D;font-family:var(--mono);}.ok{color:var(--text3);font-family:var(--mono);}
+.buy-amt{color:#0F6E56;font-family:var(--mono);font-weight:500;}
+.skipped{color:var(--text3);font-style:italic;font-size:11px;}.no-price{color:#BA7517;font-size:11px;}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:1.2rem 0 0;}
+.controls label{font-size:13px;color:var(--text2);}
+.controls input[type=number]{width:120px;}
+.calc-btn{font-size:13px;padding:6px 14px;border-radius:var(--r);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;font-family:var(--font);}
+.calc-btn:hover{background:var(--bg2);}.calc-btn:active{transform:scale(0.98);}
+.warn{display:none;font-size:11px;color:#BA7517;}
+#buySection{display:none;margin-top:1.4rem;}
+.leftover-box{background:var(--bg2);border-radius:var(--r);padding:10px 14px;margin-top:10px;font-size:12px;color:var(--text2);line-height:1.8;}
+.leftover-box strong{color:var(--text);font-weight:500;}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:1.5rem;}
+#afterChartBox{display:none;}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:7px;}
+.legend-item{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text2);}
+.legend-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+hr.sep{border:none;border-top:0.5px solid var(--border);margin:1.3rem 0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{width:12px;height:12px;border:2px solid var(--border2);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div><h1>Portfolio Rebalancer</h1><p class="sub">IBI Investment Account &nbsp;&middot;&nbsp; Irish ETF strategy &nbsp;&middot;&nbsp; Monthly buy planner</p></div>
+  <div style="text-align:right;">
+    <button class="fetch-btn" id="fetchBtn" onclick="fetchPrices()"><span id="fetchIcon">&#8635;</span><span id="fetchLabel">Fetch live prices in &#8362;</span></button>
+    <p class="price-stamp" id="priceStamp"></p>
+  </div>
+</div>
+<div class="metrics">
+  <div class="metric"><div class="metric-label">Portfolio value</div><div class="metric-value" id="m-total">&#8362;0</div></div>
+  <div class="metric"><div class="metric-label">Cash to invest</div><div class="metric-value" id="m-cash">&#8362;3,000</div></div>
+  <div class="metric"><div class="metric-label">Total after invest</div><div class="metric-value" id="m-after">&#8362;3,000</div></div>
+</div>
+<div class="slabel">Holdings &amp; targets &mdash; prices in &#8362; as shown in IBI (use Fetch to auto-populate)</div>
+<div class="overflow">
+<table>
+  <thead><tr><th class="L" style="width:12px;"></th><th class="L">ETF</th><th>Target %</th><th>Units held</th><th>Price / unit</th><th>Value &#8362;</th><th>Weight %</th><th>Drift</th></tr></thead>
+  <tbody id="holdingsBody"></tbody>
+  <tfoot><tr><td colspan="2" class="L">Total</td><td id="tgt-sum" style="font-family:var(--mono);">100%</td><td></td><td></td><td id="val-sum" style="font-family:var(--mono);">&#8362;0</td><td id="wt-sum" style="font-family:var(--mono);">100%</td><td></td></tr></tfoot>
+</table>
+</div>
+<div class="controls">
+  <label>Monthly cash (&#8362;)</label>
+  <input type="number" id="cashInput" value="3000" min="0" step="100"/>
+  <button class="calc-btn" onclick="calculate()">Calculate buys &rarr;</button>
+  <span id="tgtWarn" class="warn">&#9888; Targets must sum to 100%</span>
+  <span id="noPriceWarn" class="warn">&#9888; Fetch prices first for accurate results</span>
+</div>
+<div id="buySection">
+  <hr class="sep"/>
+  <div class="slabel">Buy this month</div>
+  <div class="overflow">
+  <table>
+    <thead><tr><th class="L" style="width:12px;"></th><th class="L">ETF</th><th>Ideal alloc &#8362;</th><th>Units to buy</th><th>Actual spend &#8362;</th><th>After value &#8362;</th><th>After weight</th><th></th></tr></thead>
+    <tbody id="buyBody"></tbody>
+    <tfoot><tr><td colspan="2" class="L">Total spent</td><td></td><td></td><td id="buy-total" style="font-family:var(--mono);color:#0F6E56;"></td><td colspan="3"></td></tr></tfoot>
+  </table>
+  </div>
+  <div class="leftover-box" id="leftoverBox"></div>
+</div>
+<div class="charts-row">
+  <div>
+    <div class="slabel" style="margin-top:1.4rem;">Current allocation</div>
+    <div class="legend" id="leg1"></div>
+    <div style="position:relative;height:220px;"><canvas id="chart1"></canvas></div>
+  </div>
+  <div id="afterChartBox">
+    <div class="slabel" style="margin-top:1.4rem;">After investing</div>
+    <div class="legend" id="leg2"></div>
+    <div style="position:relative;height:220px;"><canvas id="chart2"></canvas></div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const COLORS=['#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517','#059669','#888780','#D4537E'];
+let etfs=[
+  {ticker:'CNDX',name:'iShares NASDAQ-100 UCITS (Acc)',note:'replaces QQQ',target:18,units:0,price:0,priceRaw:0,priceCurrency:'USD',domicile:'IE'},
+  {ticker:'IWDA',name:'iShares MSCI World UCITS (Acc)',note:'global core',target:22,units:0,price:0,priceRaw:0,priceCurrency:'USD',domicile:'IE'},
+  {ticker:'ISPY',name:'L&G Cyber Security UCITS ETF',note:'cyber thematic',target:13,units:0,price:0,priceRaw:0,priceCurrency:'ILS',domicile:'IE'},
+  {ticker:'IUIT',name:'iShares S&P 500 IT UCITS (Acc)',note:'replaces VGT',target:10,units:0,price:0,priceRaw:0,priceCurrency:'USD',domicile:'IE'},
+  {ticker:'EIMI',name:'iShares MSCI EM IMI UCITS (Acc)',note:'emerging markets',target:10,units:0,price:0,priceRaw:0,priceCurrency:'USD',domicile:'IE'},
+  {ticker:'TA125',name:'\u05EA\u05DB\u05DC\u05D9\u05EA / \u05E7\u05E1\u05DD \u05EA\u0022\u05D0-125 ETF',note:'Israel index',target:7,units:0,price:0,priceRaw:0,priceCurrency:'ILS',domicile:'IL'},
+  {ticker:'QQQ',name:'Invesco NASDAQ-100 ETF',note:'existing \u2014 keep',target:10,units:6,price:0,priceRaw:0,priceCurrency:'USD',domicile:'US'},
+  {ticker:'VGT',name:'Vanguard IT ETF',note:'existing \u2014 keep',target:10,units:7,price:0,priceRaw:0,priceCurrency:'USD',domicile:'US'},
+].map((e,i)=>({...e,color:COLORS[i]}));
+let c1=null,c2=null;
+let usdIls=3.67,gbpIls=4.65; // updated by fetchPrices
+const fmt=n=>'\u20AA'+Math.round(n).toLocaleString('he-IL');
+const pct=(n,d=1)=>n.toFixed(d)+'%';
+function setPrice(i,raw,cur){
+  etfs[i].priceRaw=raw;
+  etfs[i].priceCurrency=cur;
+  etfs[i].price=raw>0?(cur==='USD'?Math.round(raw*usdIls*100)/100:raw):0;
+  const cs=document.getElementById('cs'+i);if(cs)cs.value=cur;
+  const ph=document.getElementById('ph'+i);
+  if(ph)ph.textContent=raw>0&&cur==='USD'?'\u20AA'+Math.round(etfs[i].price).toLocaleString('he-IL'):'';
+  refresh();
+}
+function renderTable(){
+  const tb=document.getElementById('holdingsBody');tb.innerHTML='';
+  etfs.forEach((e,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="L"><span class="dot" style="background:${e.color}"></span></td>
+      <td class="L"><a class="ticker" href="${yahooUrl(e.ticker)}" target="_blank" rel="noopener">${e.ticker}</a><span class="tag tag-${e.domicile}">${e.domicile}</span><span style="font-size:11px;color:var(--text2);margin-left:4px;">${e.note}</span></td>
+      <td><input type="number" value="${e.target}" min="0" max="100" step="1" style="width:54px;" onchange="etfs[${i}].target=+this.value;refresh();"/></td>
+      <td><input type="number" value="${e.units}" min="0" step="0.001" onchange="etfs[${i}].units=+this.value;refresh();"/></td>
+      <td><div style="display:flex;align-items:center;justify-content:flex-end;"><input type="number" value="${e.priceRaw||''}" min="0" step="0.01" id="pr${i}" onchange="setPrice(${i},+this.value,etfs[${i}].priceCurrency);"/><select class="cur-sel" id="cs${i}" onchange="setPrice(${i},etfs[${i}].priceRaw||0,this.value);"><option value="USD"${e.priceCurrency==='USD'?' selected':''}>$</option><option value="ILS"${e.priceCurrency==='ILS'?' selected':''}>&#8362;</option></select></div><div class="price-hint" id="ph${i}">${e.priceRaw>0&&e.priceCurrency==='USD'?'\u20AA'+Math.round(e.price).toLocaleString('he-IL'):''}</div></td>
+      <td style="font-family:var(--mono);" id="v${i}"></td><td id="w${i}"></td><td id="d${i}"></td>`;
+    tb.appendChild(tr);
+  });
+  refresh();
+}
+function refresh(){
+  const totV=etfs.reduce((s,e)=>s+e.units*e.price,0);
+  const totT=etfs.reduce((s,e)=>s+e.target,0);
+  const cash=+(document.getElementById('cashInput').value)||0;
+  etfs.forEach((e,i)=>{
+    const v=e.units*e.price,w=totV>0?v/totV*100:0,dr=w-e.target;
+    document.getElementById('v'+i).textContent=fmt(v);
+    document.getElementById('w'+i).textContent=pct(w);
+    const de=document.getElementById('d'+i);
+    de.textContent=(dr>=0?'+':'')+pct(dr);
+    de.className=dr>1.5?'over':dr<-1.5?'under':'ok';
+  });
+  document.getElementById('val-sum').textContent=fmt(totV);
+  document.getElementById('tgt-sum').textContent=totT+'%';
+  document.getElementById('m-total').textContent=fmt(totV);
+  document.getElementById('m-cash').textContent=fmt(cash);
+  document.getElementById('m-after').textContent=fmt(totV+cash);
+  document.getElementById('tgtWarn').style.display=Math.abs(totT-100)>0.5?'inline':'none';
+  renderDonut('chart1','leg1',etfs.map(e=>e.units*e.price),totV);
+  document.getElementById('buySection').style.display='none';
+  document.getElementById('afterChartBox').style.display='none';
+}
+function renderDonut(id,legId,vals,total){
+  const ctx=document.getElementById(id);
+  if(id==='chart1'&&c1){c1.destroy();c1=null;}
+  if(id==='chart2'&&c2){c2.destroy();c2=null;}
+  const inst=new Chart(ctx,{type:'doughnut',data:{labels:etfs.map(e=>e.ticker),datasets:[{data:vals.map(v=>v<1?0.001:v),backgroundColor:etfs.map(e=>e.color),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx2=>' '+etfs[ctx2.dataIndex].ticker+': '+fmt(vals[ctx2.dataIndex])}}}}});
+  if(id==='chart1')c1=inst;else c2=inst;
+  document.getElementById(legId).innerHTML=etfs.map((e,i)=>`<span class="legend-item"><span class="legend-sq" style="background:${e.color}"></span>${e.ticker} ${total>0?pct(vals[i]/total*100):'--'}</span>`).join('');
+}
+function calculate(){
+  const cash=+(document.getElementById('cashInput').value)||0;
+  const totT=etfs.reduce((s,e)=>s+e.target,0);
+  document.getElementById('tgtWarn').style.display=Math.abs(totT-100)>0.5?'inline':'none';
+  document.getElementById('noPriceWarn').style.display=etfs.some(e=>e.target>0&&e.price<=0)?'inline':'none';
+  if(Math.abs(totT-100)>0.5)return;
+  const totCurr=etfs.reduce((s,e)=>s+e.units*e.price,0);
+  const totFut=totCurr+cash;
+  const gaps=etfs.map(e=>Math.max(0,(e.target/100)*totFut-e.units*e.price));
+  const totGap=gaps.reduce((s,g)=>s+g,0);
+  const ideal=totGap>cash?gaps.map(g=>cash*g/totGap):gaps.slice();
+  const units=etfs.map((e,i)=>e.price>0?Math.floor(ideal[i]/e.price):0);
+  const afterVals=etfs.map((e,i)=>e.units*e.price+units[i]*e.price);
+  let remaining=cash-units.reduce((s,u,i)=>s+u*etfs[i].price,0);
+  for(let iter=0;iter<60&&remaining>0.01;iter++){
+    let bestIdx=-1,bestDrift=-Infinity;
+    const totA=afterVals.reduce((s,v)=>s+v,0)+remaining;
+    etfs.forEach((e,i)=>{
+      if(e.price<=0||e.price>remaining+0.01)return;
+      const drift=e.target-(totA>0?afterVals[i]/totA*100:0);
+      if(drift>bestDrift){bestDrift=drift;bestIdx=i;}
+    });
+    if(bestIdx===-1)break;
+    units[bestIdx]++;afterVals[bestIdx]+=etfs[bestIdx].price;remaining-=etfs[bestIdx].price;
+  }
+  const spent=units.map((u,i)=>u*etfs[i].price);
+  const totalSpent=spent.reduce((s,v)=>s+v,0);
+  const totAfter=afterVals.reduce((s,v)=>s+v,0);
+  const tb=document.getElementById('buyBody');tb.innerHTML='';
+  etfs.forEach((e,i)=>{
+    const tr=document.createElement('tr');
+    const aw=totAfter>0?afterVals[i]/totAfter*100:0;
+    const note=e.price<=0?'<span class="no-price">set price first</span>':units[i]===0&&ideal[i]>5?`<span class="skipped">can't afford 1 unit (${fmt(e.price)})</span>`:'';
+    tr.innerHTML=`<td class="L"><span class="dot" style="background:${e.color}"></span></td>
+      <td class="L"><a class="ticker" href="${yahooUrl(e.ticker)}" target="_blank" rel="noopener">${e.ticker}</a> <span style="font-size:11px;color:var(--text2);">${e.name}</span></td>
+      <td style="font-family:var(--mono);color:var(--text2);">${ideal[i]>1?fmt(ideal[i]):'--'}</td>
+      <td style="font-family:var(--mono);font-weight:500;">${units[i]}</td>
+      <td class="${units[i]>0?'buy-amt':''}">${units[i]>0?fmt(spent[i]):'\u20AA0'}</td>
+      <td style="font-family:var(--mono);">${fmt(afterVals[i])}</td>
+      <td>${pct(aw)}</td><td>${note}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('buy-total').textContent=fmt(totalSpent);
+  const afford=etfs.filter(e=>e.price>0&&e.price<=remaining).map(e=>e.ticker);
+  const cantAfford=etfs.filter((_,i)=>units[i]===0&&etfs[i].price>0&&ideal[i]>5).map(e=>e.ticker+' ('+fmt(e.price)+'/unit)');
+  let msg=`<strong>Spent:</strong> ${fmt(totalSpent)} &nbsp;&middot;&nbsp; <strong>Leftover:</strong> ${fmt(remaining)}<br>`;
+  if(remaining>0&&afford.length)msg+=`Still enough for 1 more unit of: <strong>${afford.join(', ')}</strong>.<br>`;
+  if(remaining>0&&!afford.length)msg+=`Remaining ${fmt(remaining)} is below the cheapest unit &mdash; carry forward next month.<br>`;
+  if(cantAfford.length)msg+=`Could not buy: <strong>${cantAfford.join(', ')}</strong> &mdash; insufficient cash for a full unit this month.`;
+  document.getElementById('leftoverBox').innerHTML=msg;
+  document.getElementById('buySection').style.display='block';
+  renderDonut('chart2','leg2',afterVals,totAfter);
+  document.getElementById('afterChartBox').style.display='block';
+}
+// ── Yahoo Finance ticker map (LSE = .L, TASE = .TA, US = no suffix) ─────
+const YAHOO={
+  CNDX:{sym:'CNDX.L'},
+  IWDA:{sym:'IWDA.L'},
+  ISPY:{sym:'ISPY.L'},
+  IUIT:{sym:'IUIT.L'},
+  EIMI:{sym:'EIMI.L'},
+  TA125:{sym:'TA125.TA'},
+  QQQ: {sym:'QQQ'},
+  VGT: {sym:'VGT'},
+};
+
+function yahooUrl(ticker){
+  const sym=YAHOO[ticker]?.sym||ticker;
+  return `https://finance.yahoo.com/quote/${encodeURIComponent(sym)}/`;
+}
+
+// CORS proxies tried in order per ticker — stop at first success
+const PROXIES=[
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+// Fetch one Yahoo Finance ticker; returns {price, currency} or null
+async function yahooPrice(sym){
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=5d&interval=1d`;
+  for(const mkP of PROXIES){
+    try{
+      const res=await fetch(mkP(url),{signal:AbortSignal.timeout(10000)});
+      if(!res.ok) continue;
+      const data=await res.json();
+      const result=data?.chart?.result?.[0];
+      if(!result) continue;
+      const price=result.meta?.regularMarketPrice;
+      const currency=result.meta?.currency;
+      if(price>0) return {price,currency};
+    }catch(_){continue;}
+  }
+  return null;
+}
+
+// ── Main fetch ───────────────────────────────────────────────────────────
+async function fetchPrices(){
+  const btn=document.getElementById('fetchBtn');
+  const lbl=document.getElementById('fetchLabel');
+  const icon=document.getElementById('fetchIcon');
+  btn.disabled=true;
+  icon.innerHTML='<span class="spinner"></span>';
+  lbl.textContent='Fetching prices\u2026';
+  document.getElementById('priceStamp').textContent='';
+
+  // Step 1 — FX: Frankfurter (ECB data, CORS-safe, no key needed)
+  try{
+    const fx=await fetch('https://api.frankfurter.app/latest?from=USD&to=GBP,ILS',{signal:AbortSignal.timeout(7000)});
+    if(fx.ok){
+      const d=await fx.json();
+      if(d.rates?.ILS) usdIls=d.rates.ILS;
+      if(d.rates?.GBP){
+        // derive GBP/ILS = USD/ILS ÷ USD/GBP
+        gbpIls=usdIls/d.rates.GBP;
+      }
+    }
+  }catch(_){/* use hardcoded fallbacks */}
+
+  // Step 2 — ETF prices via Yahoo Finance JSON (works on weekends — returns last close)
+  const keys=Object.keys(YAHOO);
+  const rawPrices=await Promise.allSettled(keys.map(k=>yahooPrice(YAHOO[k].sym)));
+
+  let updated=0;
+  const log=[];
+  keys.forEach((key,i)=>{
+    const r=rawPrices[i];
+    if(r.status!=='fulfilled'||r.value===null){log.push(key+'\u2717');return;}
+    const {price:raw,currency}=r.value;
+    let price,priceRaw,priceCurrency;
+    // Yahoo Finance reports the native currency of each listing
+    if(currency==='ILS'){price=raw;priceRaw=raw;priceCurrency='ILS';}
+    else if(currency==='GBp'){price=Math.round((raw/100)*gbpIls*100)/100;priceRaw=price;priceCurrency='ILS';}
+    else if(currency==='GBP'){price=Math.round(raw*gbpIls*100)/100;priceRaw=price;priceCurrency='ILS';}
+    else{price=Math.round(raw*usdIls*100)/100;priceRaw=raw;priceCurrency='USD';}// USD
+    const idx=etfs.findIndex(e=>e.ticker===key);
+    if(idx<0) return;
+    etfs[idx].price=price;
+    etfs[idx].priceRaw=priceRaw;
+    etfs[idx].priceCurrency=priceCurrency;
+    const inp=document.getElementById('pr'+idx);if(inp){inp.value=priceRaw;inp.style.color='#0F6E56';}
+    const cs=document.getElementById('cs'+idx);if(cs)cs.value=priceCurrency;
+    const ph=document.getElementById('ph'+idx);if(ph)ph.textContent=priceCurrency==='USD'&&priceRaw>0?'\u20AA'+Math.round(price).toLocaleString('he-IL'):'';
+    log.push(key+'\u2713');
+    updated++;
+  });
+  refresh();
+
+  const now=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  const rateStr=`$1=\u20AA${usdIls.toFixed(3)} \u00B7 \u00A31=\u20AA${gbpIls.toFixed(2)}`;
+  document.getElementById('priceStamp').textContent=
+    `Yahoo Finance \u00B7 ${now} \u00B7 ${rateStr} \u00B7 ${log.join(' ')}`;
+
+  if(updated>0){
+    icon.textContent='\u2713';
+    lbl.textContent=`${updated}/${keys.length} prices loaded`;
+    setTimeout(()=>{
+      icon.textContent='\u27F3';lbl.textContent='Refresh prices';btn.disabled=false;
+      etfs.forEach((_,i)=>{const inp=document.getElementById('pr'+i);if(inp)inp.style.color='';const ph=document.getElementById('ph'+i);if(ph)ph.style.color='';});
+    },4000);
+  }else{
+    icon.textContent='!';
+    lbl.textContent='All sources failed \u2014 enter prices manually';
+    document.getElementById('priceStamp').textContent='All CORS proxies blocked. Enter prices manually from IBI.';
+    btn.disabled=false;
+  }
+}
+document.getElementById('cashInput').addEventListener('input',refresh);
+renderTable();
+</script>
+</body>
+</html>
